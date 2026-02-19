@@ -55,7 +55,8 @@ def eval_libero(args: Args) -> None:
     num_tasks_in_suite = task_suite.n_tasks
     logging.info(f"Task suite: {args.task_suite_name}")
 
-    pathlib.Path(args.video_out_path).mkdir(parents=True, exist_ok=True)
+    video_dir = pathlib.Path(f"{args.video_out_path}/{args.task_suite_name}")
+    video_dir.mkdir(parents=True, exist_ok=True)
 
     if args.task_suite_name == "libero_spatial":
         max_steps = 220  # longest training demo has 193 steps
@@ -167,8 +168,11 @@ def eval_libero(args: Args) -> None:
             # Save a replay video of the episode
             suffix = "success" if done else "failure"
             task_segment = task_description.replace(" ", "_")
+
+            # create directory for video
+            pathlib.Path((video_dir) / f"{task_segment}").mkdir(parents=True, exist_ok=True)
             imageio.mimwrite(
-                pathlib.Path(args.video_out_path) / f"rollout_{task_segment}_{suffix}.mp4",
+                pathlib.Path(video_dir) / f"{task_segment}" / f"rollout_{task_episodes}_{suffix}.mp4",
                 [np.asarray(x) for x in replay_images],
                 fps=10,
             )

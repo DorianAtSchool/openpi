@@ -1,0 +1,50 @@
+============================================================
+ Config:     pi05_franka_pick_place_lora
+ Experiment: lora_pick_place_v1
+ GPU info:
+NVIDIA A100-SXM4-80GB, 81920 MiB
+============================================================
+
+>>> Computing normalization statistics...
+warning: The `tool.uv.dev-dependencies` field (used in `packages/openpi-client/pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+warning: `VIRTUAL_ENV=/work/pi_shlomo_umass_edu/openpi/openpi/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+Traceback (most recent call last):
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/lerobot/common/datasets/lerobot_dataset.py", line 95, in __init__
+    self.load_metadata()
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/lerobot/common/datasets/lerobot_dataset.py", line 105, in load_metadata
+    self.info = load_info(self.root)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/lerobot/common/datasets/utils.py", line 178, in load_info
+    info = load_json(local_dir / INFO_PATH)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/lerobot/common/datasets/utils.py", line 146, in load_json
+    with open(fpath) as f:
+         ^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/dbenhamougol_umass_edu/.cache/huggingface/lerobot/DorianAtSchool/pick_place_combined/meta/info.json'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/scripts/compute_norm_stats.py", line 117, in <module>
+    tyro.cli(main)
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/tyro/_cli.py", line 229, in cli
+    return run_with_args_from_cli()
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/scripts/compute_norm_stats.py", line 98, in main
+    data_loader, num_batches = create_torch_dataloader(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/scripts/compute_norm_stats.py", line 34, in create_torch_dataloader
+    dataset = _data_loader.create_torch_dataset(data_config, action_horizon, model_config)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/src/openpi/training/data_loader.py", line 140, in create_torch_dataset
+    dataset_meta = lerobot_dataset.LeRobotDatasetMetadata(repo_id)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/lerobot/common/datasets/lerobot_dataset.py", line 98, in __init__
+    self.revision = get_safe_version(self.repo_id, self.revision)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pi_shlomo_umass_edu/DBG_scraps/openpi/openpi/.venv/lib/python3.11/site-packages/lerobot/common/datasets/utils.py", line 360, in get_safe_version
+    raise ForwardCompatibilityError(repo_id, min(upper_versions))
+lerobot.common.datasets.backward_compatibility.ForwardCompatibilityError: 
+The dataset you requested (DorianAtSchool/pick_place_combined) is only available in 3.0 format.
+As we cannot ensure forward compatibility with it, please update your current version of lerobot.
+

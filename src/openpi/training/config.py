@@ -19,6 +19,7 @@ import openpi.models.pi0_fast as pi0_fast
 import openpi.models.tokenizer as _tokenizer
 import openpi.policies.aloha_policy as aloha_policy
 import openpi.policies.droid_policy as droid_policy
+import openpi.policies.franka_pick_place_policy as franka_pp_policy
 import openpi.policies.libero_policy as libero_policy
 import openpi.shared.download as _download
 import openpi.shared.normalize as _normalize
@@ -447,6 +448,61 @@ class LeRobotDROIDDataConfig(DataConfigFactory):
 
         return dataclasses.replace(
             self.create_base_config(assets_dirs, model_config),
+            repack_transforms=repack_transform,
+            data_transforms=data_transforms,
+            model_transforms=model_transforms,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class LeRobotFrankaPickPlaceDataConfig(DataConfigFactory):
+    """
+    Data config for the Franka pick-and-place dataset (DorianAtSchool/pick_place).
+
+    Dataset features (LeRobot v3):
+      - observation.images.top   (video 224x224x3)
+      - observation.images.side  (video 224x224x3)
+      - observation.images.wrist (video 224x224x3)
+      - observation.state        (float32 [8])
+      - action                   (float32 [7])  — already delta EEF
+    """
+
+    @override
+    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
+        # RepackTransform: map LeRobot v3 dot-separated column names
+        # to the observation/xxx keys that FrankaPickPlaceInputs expects.
+        # Left side = new key (target), right side = old key (source in flattened LeRobot output).
+        repack_transform = _transforms.Group(
+            inputs=[
+                _transforms.RepackTransform(
+                    {
+                        "observation/top_image": "observation.images.top",
+                        "observation/side_image": "observation.images.side",
+                        "observation/wrist_image": "observation.images.wrist",
+                        "observation/state": "observation.state",
+                        "actions": "action",
+                        "prompt": "prompt",
+                    }
+                )
+            ]
+        )
+
+        # Data transforms applied during training AND inference.
+        data_transforms = _transforms.Group(
+            inputs=[franka_pp_policy.FrankaPickPlaceInputs(model_type=model_config.model_type)],
+            outputs=[franka_pp_policy.FrankaPickPlaceOutputs()],
+        )
+
+        # No extra delta transform — the dataset's actions are already delta EEF.
+
+        model_transforms = ModelTransformFactory()(model_config)
+
+        # Always set action_sequence_keys, even if base_config is present and overrides other fields.
+        base = self.create_base_config(assets_dirs, model_config)
+        # Remove action_sequence_keys if present in base (dataclasses.replace does not override tuple default if frozen)
+        base = dataclasses.replace(base, action_sequence_keys=("action",))
+        return dataclasses.replace(
+            base,
             repack_transforms=repack_transform,
             data_transforms=data_transforms,
             model_transforms=model_transforms,
@@ -955,6 +1011,71 @@ _CONFIGS = [
         overwrite=True,
         exp_name="debug_pi05",
         wandb_enabled=False,
+    ),
+    #
+    # Fine-tuning Franka pick-and-place configs.
+    #
+    TrainConfig(
+        name="pi05_franka_pick_place",
+        # Full pi0.5 fine-tuning on the pick-and-place dataset.
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_horizon=10,
+            discrete_state_input=False,
+        ),
+        data=LeRobotFrankaPickPlaceDataConfig(
+            repo_id="DorianAtSchool/pick_place_combined_v2",
+            base_config=DataConfig(prompt_from_task=True),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "gs://openpi-assets/checkpoints/pi05_base/params"
+        ),
+        batch_size=32,
+        lr_schedule=_optimizer.CosineDecaySchedule(
+            warmup_steps=1_000,
+            peak_lr=5e-5,
+            decay_steps=100_000,
+            decay_lr=5e-5,
+        ),
+        optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
+        ema_decay=0.999,
+        num_train_steps=20_000,
+    ),
+    TrainConfig(
+        name="pi05_franka_pick_place_lora",
+        # pi0.5 LoRA fine-tuning: only LoRA adapter weights are trainable.
+        # Uses gemma_2b_lora for the VLM backbone, gemma_300m_lora for the action expert.
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_horizon=10,
+            discrete_state_input=False,
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+        ),
+        data=LeRobotFrankaPickPlaceDataConfig(
+            repo_id="DorianAtSchool/pick_place_combined_v2",
+            base_config=DataConfig(prompt_from_task=True),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "gs://openpi-assets/checkpoints/pi05_base/params"
+        ),
+        batch_size=32,
+        lr_schedule=_optimizer.CosineDecaySchedule(
+            warmup_steps=1_000,
+            peak_lr=5e-5,
+            decay_steps=100_000,
+            decay_lr=5e-5,
+        ),
+        optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
+        num_train_steps=20_000,
+        # Freeze everything except LoRA adapters.
+        freeze_filter=pi0_config.Pi0Config(
+            pi05=True,
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+        ).get_freeze_filter(),
+        # Disable EMA for LoRA — fewer params to track.
+        ema_decay=None,
     ),
     #
     # RoboArena configs.
